@@ -3,6 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,12 +27,8 @@ jobs:
 
       - name: FIX JVM 1.8 vs 17 Brutal
         run: |
-          # 1. Matikan validasi JVM-target biar gak fail lagi
           echo "kotlin.jvm.target.validation.mode=IGNORE" >> gradle.properties
-          echo "android.suppressUnsupportedCompileSdk=34" >> gradle.properties
           cat gradle.properties
-
-          # 2. Paksa semua file jadi 17 pakai python (lebih ampuh dari sed)
           python3 << 'PY'
           import pathlib, re, glob
           for f in glob.glob("**/build.gradle.kts", recursive=True) + glob.glob("**/build.gradle", recursive=True):
@@ -42,24 +39,20 @@ jobs:
               t = t.replace("JVM_1_8", "JVM_17")
               t = re.sub(r'jvmTarget\s*=\s*["\']1\.8["\']', 'jvmTarget = "17"', t)
               t = re.sub(r'"1\.8"', '"17"', t)
-              t = re.sub(r"JavaVersion\.VERSION_1_8", "JavaVersion.VERSION_17", t)
-              # paksa compileOptions kalau masih ada yang bandel
-              if "sourceCompatibility" in t and "VERSION_17" not in t.split("sourceCompatibility")[1][:100]:
-                  t = re.sub(r'sourceCompatibility.*\n', ' sourceCompatibility = JavaVersion.VERSION_17\n', t)
-                  t = re.sub(r'targetCompatibility.*\n', ' targetCompatibility = JavaVersion.VERSION_17\n', t)
-              if t!= orig:
+              if t != orig:
                   print(f"Fixed {f}")
                   p.write_text(t)
           PY
-
-          echo "=== Hasil app/build.gradle.kts ==="
-          cat app/build.gradle.kts | grep -E "VERSION|jvmTarget|sourceComp|targetComp" -n
+          echo "=== CEK ==="
+          cat app/build.gradle.kts | grep -E "VERSION|jvmTarget" | head -n 20 || true
 
       - name: Build APK
         run: |
-          if [! -f "./gradlew" ]; then gradle wrapper --gradle-version 8.7; fi
-          chmod +x./gradlew
-         ./gradlew assembleDebug --stacktrace
+          if [ ! -f "./gradlew" ]; then
+            gradle wrapper --gradle-version 8.7
+          fi
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
