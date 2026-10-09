@@ -14,31 +14,35 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Android SDK (FIX bug sdkmanager 16.0)
+      - name: Setup Android SDK
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-      - name: Benerin JVM Target jadi 17
+      - name: Cek struktur project
         run: |
-          echo "Nambal build.gradle.kts..."
-          find . -name "build.gradle.kts" -exec sed -i 's/JvmTarget.JVM_1_8/JvmTarget.JVM_17/g' {} \;
-          find . -name "build.gradle.kts" -exec sed -i 's/jvmTarget.*=.*".*1.8.*"/jvmTarget = "17"/g' {} \;
-          find . -name "build.gradle.kts" -exec sed -i 's/sourceCompatibility.*VERSION_1_8/sourceCompatibility = JavaVersion.VERSION_17/g' {} \;
-          find . -name "build.gradle.kts" -exec sed -i 's/targetCompatibility.*VERSION_1_8/targetCompatibility = JavaVersion.VERSION_17/g' {} \;
-          find . -name "build.gradle" -exec sed -i 's/JvmTarget.JVM_1_8/JvmTarget.JVM_17/g' {} \;
-          echo "--- app/build.gradle.kts setelah ditambal ---"
-          cat app/build.gradle.kts | head -n 120 || cat app/build.gradle | head -n 120
+          ls -R | head -n 100
+          echo "--- settings.gradle ---"
+          cat settings.gradle.kts || cat settings.gradle || echo "ga ada"
+
+      - name: Benerin JVM Target 17 total
+        run: |
+          # tambal semua kemungkinan file
+          find . -type f -name "*.kts" -exec sed -i 's/JVM_1_8/JVM_17/g; s/"1.8"/"17"/g; s/VERSION_1_8/VERSION_17/g' {} \;
+          find . -type f -name "*.gradle" -exec sed -i 's/JVM_1_8/JVM_17/g; s/VERSION_1_8/VERSION_17/g' {} \;
+          # paksa kotlin jvmTarget di app/build.gradle.kts
+          grep -q "jvmTarget" app/build.gradle.kts && sed -i 's/jvmTarget.*/jvmTarget = "17"/g' app/build.gradle.kts || echo 'android { kotlinOptions { jvmTarget = "17" } }' >> app/build.gradle.kts
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Grant permission & Build APK
+      - name: Build APK
         run: |
-          chmod +x gradlew || true
-          ./gradlew assembleDebug --stacktrace || gradle assembleDebug --stacktrace
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace --info | tail -n 300
 
       - name: Upload APK
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: apk-hasil
