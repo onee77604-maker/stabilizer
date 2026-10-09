@@ -19,29 +19,26 @@ jobs:
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-      - name: Benerin JVM Target 17 total
-        run: |
-          find . -type f -name "*.kts" -exec sed -i 's/JVM_1_8/JVM_17/g; s/"1.8"/"17"/g; s/VERSION_1_8/VERSION_17/g' {} \; || true
-          find . -type f -name "*.gradle" -exec sed -i 's/JVM_1_8/JVM_17/g; s/VERSION_1_8/VERSION_17/g' {} \; || true
-
-      - name: Setup Gradle
+      - name: Setup Gradle 8.7 (FIX Gradle 9.8.0)
         uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.7
+
+      - name: Benerin JVM Target 17
+        run: |
+          find . -type f \( -name "*.kts" -o -name "*.gradle" \) -exec sed -i 's/JVM_1_8/JVM_17/g; s/VERSION_1_8/VERSION_17/g; s/"1.8"/"17"/g' {} \; || true
 
       - name: Build APK
         run: |
-          echo "Cek gradlew ada gak?"
-          ls -lh | grep gradle || true
-          # Kalau ada gradlew pakai itu, kalau gak ada pakai gradle langsung
-          if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
-            ./gradlew assembleDebug --stacktrace
-          else
-            echo "gradlew gak ada, pakai gradle global"
-            gradle assembleDebug --stacktrace
+          # Bikin wrapper kalau gak ada
+          if [ ! -f "./gradlew" ]; then
+            echo "gradlew gak ada, bikin wrapper 8.7"
+            gradle wrapper --gradle-version 8.7
           fi
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: apk-hasil
