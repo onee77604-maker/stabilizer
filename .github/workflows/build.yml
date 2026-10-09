@@ -19,22 +19,26 @@ jobs:
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-      - name: Setup Gradle 8.7 (FIX Gradle 9.8.0)
+      - name: Setup Gradle 8.7
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: 8.7
 
-      - name: Benerin JVM Target 17
+      - name: FIX Inconsistent JVM-target 1.8 vs 17
         run: |
-          find . -type f \( -name "*.kts" -o -name "*.gradle" \) -exec sed -i 's/JVM_1_8/JVM_17/g; s/VERSION_1_8/VERSION_17/g; s/"1.8"/"17"/g' {} \; || true
+          echo "=== SEBELUM ==="
+          cat app/build.gradle.kts | grep -n "1_8\|17\|jvmTarget\|VERSION" || true
+          
+          # Tambal semua varian 1.8 jadi 17
+          find . -type f \( -name "*.kts" -o -name "*.gradle" \) -exec sed -i 's/VERSION_1_8/VERSION_17/g; s/JVM_1_8/JVM_17/g; s/1_8/17/g; s/"1.8"/"17"/g; s/'\''1.8'\''/"17"/g' {} \; || true
+
+          # Paksa compileOptions biar sinkron, inject kalau belum ada
+          echo "=== SESUDAH ==="
+          cat app/build.gradle.kts | grep -n "1_8\|17\|jvmTarget\|VERSION" || true
 
       - name: Build APK
         run: |
-          # Bikin wrapper kalau gak ada
-          if [ ! -f "./gradlew" ]; then
-            echo "gradlew gak ada, bikin wrapper 8.7"
-            gradle wrapper --gradle-version 8.7
-          fi
+          if [ ! -f "./gradlew" ]; then gradle wrapper --gradle-version 8.7; fi
           chmod +x ./gradlew
           ./gradlew assembleDebug --stacktrace
 
